@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+     <meta charset="UTF-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <title>LiveTrace — Map</title>
+     <link rel="preconnect" href="https://fonts.googleapis.com" />
+     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap"
+          rel="stylesheet" />
+     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+     <style>
+          :root {
+               --bg: #0a0c0f;
+               --surface: #111418;
+               --border: #1e2530;
+               --accent: #00e5a0;
+               --accent-dim: rgba(0, 229, 160, 0.1);
+               --text: #d4dbe8;
+               --muted: #4a5568;
+               --danger: #ff4d6d;
+               --mono: 'Share Tech Mono', monospace;
+               --sans: 'DM Sans', sans-serif;
+          }
+
+          * {
+               margin: 0;
+               padding: 0;
+               box-sizing: border-box;
+          }
+
+          body {
+               background: var(--bg);
+               color: var(--text);
+               font-family: var(--sans);
+               height: 100vh;
+               display: flex;
+               flex-direction: column;
+               overflow: hidden;
+          }
+
+          /* ── TOPBAR ── */
+          .topbar {
+               height: 52px;
+               background: var(--surface);
+               border-bottom: 1px solid var(--border);
+               display: flex;
+               align-items: center;
+               padding: 0 20px;
+               gap: 20px;
+               flex-shrink: 0;
+               z-index: 1000;
+          }
+
+          .brand {
+               font-family: var(--mono);
+               font-size: 13px;
+               color: var(--accent);
+               letter-spacing: 2px;
+               display: flex;
+               align-items: center;
+               gap: 8px;
+          }
+
+          .brand-dot {
+               width: 6px;
+               height: 6px;
+               background: var(--accent);
+               border-radius: 50%;
+               animation: blink 1.5s step-end infinite;
+          }
+
+          @keyframes blink {
+
+               0%,
+               100% {
+                    opacity: 1;
+               }
+
+               50% {
+                    opacity: 0;
+               }
+          }
+
+          .topbar-spacer {
+               flex: 1;
+          }
+
+          .status-pill {
+               display: flex;
+               align-items: center;
+               gap: 6px;
+               font-family: var(--mono);
+               font-size: 10px;
+               color: var(--muted);
+               letter-spacing: 1px;
+               padding: 4px 10px;
+               border: 1px solid var(--border);
+               border-radius: 2px;
+          }
+
+          .status-pill .dot {
+               width: 5px;
+               height: 5px;
+               border-radius: 50%;
+               background: var(--muted);
+          }
+
+          .status-pill.connected .dot {
+               background: var(--accent);
+               animation: blink 1.5s step-end infinite;
+          }
+
+          .status-pill.connected {
+               color: var(--accent);
+               border-color: rgba(0, 229, 160, 0.3);
+          }
+
+          .user-chip {
+               display: flex;
+               align-items: center;
+               gap: 8px;
+               padding: 4px 12px 4px 6px;
+               border: 1px solid var(--border);
+               border-radius: 2px;
+               font-size: 13px;
+          }
+
+          .user-avatar {
+               width: 26px;
+               height: 26px;
+               border-radius: 50%;
+               object-fit: cover;
+               border: 1px solid var(--border);
+          }
+
+          .user-avatar-placeholder {
+               width: 26px;
+               height: 26px;
+               border-radius: 50%;
+               background: var(--accent-dim);
+               border: 1px solid rgba(0, 229, 160, 0.3);
+               display: flex;
+               align-items: center;
+               justify-content: center;
+               font-family: var(--mono);
+               font-size: 11px;
+               color: var(--accent);
+          }
+
+          .user-name {
+               font-size: 13px;
+               font-weight: 400;
+               color: var(--text);
+          }
+
+          .logout-btn {
+               background: transparent;
+               border: 1px solid var(--border);
+               border-radius: 2px;
+               color: var(--muted);
+               font-family: var(--mono);
+               font-size: 10px;
+               letter-spacing: 1px;
+               padding: 6px 12px;
+               cursor: pointer;
+               transition: border-color 0.2s, color 0.2s;
+          }
+
+          .logout-btn:hover {
+               border-color: var(--danger);
+               color: var(--danger);
+          }
+
+          /* ── MAIN LAYOUT ── */
+          .main {
+               flex: 1;
+               display: flex;
+               overflow: hidden;
+          }
+
+          /* ── SIDEBAR ── */
+          .sidebar {
+               width: 240px;
+               flex-shrink: 0;
+               background: var(--surface);
+               border-right: 1px solid var(--border);
+               display: flex;
+               flex-direction: column;
+               overflow: hidden;
+          }
+
+          .sidebar-header {
+               padding: 14px 16px;
+               border-bottom: 1px solid var(--border);
+               font-family: var(--mono);
+               font-size: 10px;
+               color: var(--muted);
+               letter-spacing: 2px;
+               display: flex;
+               align-items: center;
+               justify-content: space-between;
+          }
+
+          .active-count {
+               background: var(--accent-dim);
+               color: var(--accent);
+               border: 1px solid rgba(0, 229, 160, 0.2);
+               border-radius: 2px;
+               padding: 2px 7px;
+               font-size: 10px;
+          }
+
+          .user-list {
+               flex: 1;
+               overflow-y: auto;
+               padding: 8px 0;
+          }
+
+          .user-list::-webkit-scrollbar {
+               width: 4px;
+          }
+
+          .user-list::-webkit-scrollbar-track {
+               background: transparent;
+          }
+
+          .user-list::-webkit-scrollbar-thumb {
+               background: var(--border);
+               border-radius: 2px;
+          }
+
+          .user-item {
+               display: flex;
+               align-items: center;
+               gap: 10px;
+               padding: 8px 16px;
+               cursor: pointer;
+               transition: background 0.15s;
+               border-left: 2px solid transparent;
+          }
+
+          .user-item:hover {
+               background: var(--accent-dim);
+          }
+
+          .user-item.self {
+               border-left-color: var(--accent);
+          }
+
+          .user-item-dot {
+               width: 8px;
+               height: 8px;
+               border-radius: 50%;
+               background: var(--accent);
+               flex-shrink: 0;
+               animation: blink 2s ease-in-out infinite;
+          }
+
+          .user-item-info {
+               flex: 1;
+               min-width: 0;
+          }
+
+          .user-item-name {
+               font-size: 13px;
+               white-space: nowrap;
+               overflow: hidden;
+               text-overflow: ellipsis;
+          }
+
+          .user-item-coords {
+               font-family: var(--mono);
+               font-size: 9px;
+               color: var(--muted);
+               margin-top: 2px;
+               white-space: nowrap;
+               overflow: hidden;
+               text-overflow: ellipsis;
+          }
+
+          /* ── MAP ── */
+          #map {
+               flex: 1;
+               z-index: 1;
+               filter: brightness(0.9) contrast(1.05);
+          }
+
+          /* Dark tile overlay */
+          .leaflet-tile {
+               filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+          }
+
+          /* ── BOTTOM BAR ── */
+          .bottombar {
+               height: 32px;
+               background: var(--surface);
+               border-top: 1px solid var(--border);
+               display: flex;
+               align-items: center;
+               padding: 0 16px;
+               gap: 24px;
+               flex-shrink: 0;
+               z-index: 1000;
+          }
+
+          .stat {
+               display: flex;
+               align-items: center;
+               gap: 6px;
+               font-family: var(--mono);
+               font-size: 10px;
+               color: var(--muted);
+          }
+
+          .stat-value {
+               color: var(--accent);
+          }
+
+          /* ── LOADING OVERLAY ── */
+          #loading-overlay {
+               position: fixed;
+               inset: 0;
+               background: var(--bg);
+               display: flex;
+               flex-direction: column;
+               align-items: center;
+               justify-content: center;
+               gap: 16px;
+               z-index: 9999;
+               transition: opacity 0.4s;
+          }
+
+          #loading-overlay.hidden {
+               opacity: 0;
+               pointer-events: none;
+          }
+
+          .spinner {
+               width: 40px;
+               height: 40px;
+               border: 2px solid var(--border);
+               border-top-color: var(--accent);
+               border-radius: 50%;
+               animation: spin 0.8s linear infinite;
+          }
+
+          @keyframes spin {
+               to {
+                    transform: rotate(360deg);
+               }
+          }
+
+          .loading-text {
+               font-family: var(--mono);
+               font-size: 11px;
+               color: var(--muted);
+               letter-spacing: 2px;
+          }
+     </style>
+</head>
+
+<body>
+
+     <!-- LOADING -->
+     <div id="loading-overlay">
+          <div class="spinner"></div>
+          <div class="loading-text">AUTHENTICATING...</div>
+     </div>
+
+     <!-- TOPBAR -->
+     <div class="topbar">
+          <div class="brand">
+               <div class="brand-dot"></div>
+               LIVETRACE
+          </div>
+
+          <div class="topbar-spacer"></div>
+
+          <div class="status-pill" id="conn-status">
+               <div class="dot"></div>
+               <span>DISCONNECTED</span>
+          </div>
+
+          <div class="user-chip">
+               <div class="user-avatar-placeholder" id="user-avatar-placeholder">?</div>
+               <img class="user-avatar" id="user-avatar-img" style="display:none" src="" alt="avatar" />
+               <span class="user-name" id="user-name-display">—</span>
+          </div>
+
+          <button class="logout-btn" id="logout-btn">LOGOUT</button>
+     </div>
+
+     <!-- MAIN -->
+     <div class="main">
+          <!-- SIDEBAR -->
+          <div class="sidebar">
+               <div class="sidebar-header">
+                    ACTIVE USERS
+                    <span class="active-count" id="active-count">0</span>
+               </div>
+               <div class="user-list" id="user-list"></div>
+          </div>
+
+          <!-- MAP -->
+          <div id="map"></div>
+     </div>
+
+     <!-- BOTTOM BAR -->
+     <div class="bottombar">
+          <div class="stat">LAT <span class="stat-value" id="stat-lat">—</span></div>
+          <div class="stat">LNG <span class="stat-value" id="stat-lng">—</span></div>
+          <div class="stat">USERS <span class="stat-value" id="stat-users">0</span></div>
+          <div class="stat">UPDATES <span class="stat-value" id="stat-updates">0</span></div>
+     </div>
+
+     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+     <script src="/socket.io/socket.io.js"></script>
+     <script>
+          // ── STATE ──
+          let currentUser = null
+          let myMarker = null
+          let updateCount = 0
+          const remoteMarkers = new Map()   // userId → { marker, name }
+          const userItems = new Map()       // userId → sidebar DOM element
+
+          // ── AUTH GUARD ──
+          async function checkAuth() {
+               try {
+                    const res = await fetch('/api/v1/auth/me', { credentials: 'include' })
+                    if (!res.ok) {
+                         window.location.href = '/api/v1/auth/login'
+                         return null
+                    }
+                    return await res.json()
+               } catch {
+                    window.location.href = '/api/v1/auth/login'
+                    return null
+               }
+          }
+
+          // ── MAP SETUP ──
+          const map = L.map('map').setView([30.3753, 69.3451], 5)  // default: Pakistan
+          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+               maxZoom: 19,
+               attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          }).addTo(map)
+
+          // ── CUSTOM ICONS ──
+          function makeIcon(color = '#00e5a0', label = '') {
+               return L.divIcon({
+                    className: '',
+                    html: `
+          <div style="
+            position:relative;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+          ">
+            <div style="
+              width:14px; height:14px;
+              background:${color};
+              border-radius:50%;
+              border:2px solid #0a0c0f;
+              box-shadow:0 0 10px ${color}88;
+            "></div>
+            ${label ? `<div style="
+              margin-top:4px;
+              font-family:'Share Tech Mono',monospace;
+              font-size:9px;
+              color:${color};
+              background:#0a0c0f;
+              border:1px solid ${color}44;
+              padding:1px 5px;
+              border-radius:2px;
+              white-space:nowrap;
+            ">${label}</div>` : ''}
+          </div>
+        `,
+                    iconAnchor: [7, 7]
+               })
+          }
+
+          // ── SOCKET ──
+          const socket = io({ withCredentials: true })
+
+          socket.on('connect', () => {
+               const pill = document.getElementById('conn-status')
+               pill.classList.add('connected')
+               pill.innerHTML = '<div class="dot"></div><span>CONNECTED</span>'
+          })
+
+          socket.on('disconnect', () => {
+               const pill = document.getElementById('conn-status')
+               pill.classList.remove('connected')
+               pill.innerHTML = '<div class="dot"></div><span>DISCONNECTED</span>'
+          })
+
+          // Receive location of other users
+          socket.on('server:location_update', (data) => {
+               const { userId, latitude, longitude, name } = data
+               if (!userId || userId === currentUser?.id) return
+
+               updateCount++
+               document.getElementById('stat-updates').textContent = updateCount
+
+               if (!remoteMarkers.has(userId)) {
+                    const marker = L.marker([latitude, longitude], {
+                         icon: makeIcon('#60a5fa', name || userId.slice(0, 8))
+                    }).addTo(map)
+                    marker.bindPopup(`<b style="font-family:monospace;font-size:12px">${name || 'User'}</b>`)
+                    remoteMarkers.set(userId, { marker, name })
+                    addSidebarUser(userId, name, latitude, longitude)
+               } else {
+                    remoteMarkers.get(userId).marker.setLatLng([latitude, longitude])
+                    updateSidebarUser(userId, latitude, longitude)
+               }
+
+               document.getElementById('stat-users').textContent = remoteMarkers.size
+               document.getElementById('active-count').textContent = remoteMarkers.size + 1
+          })
+
+          // Remove disconnected users
+          socket.on('server:user_disconnected', ({ userId }) => {
+               if (remoteMarkers.has(userId)) {
+                    map.removeLayer(remoteMarkers.get(userId).marker)
+                    remoteMarkers.delete(userId)
+               }
+               removeSidebarUser(userId)
+               document.getElementById('stat-users').textContent = remoteMarkers.size
+               document.getElementById('active-count').textContent = remoteMarkers.size + 1
+          })
+
+          // ── GEOLOCATION ──
+          function getUserLocation() {
+               return new Promise((resolve, reject) => {
+                    if (!('geolocation' in navigator)) {
+                         reject(new Error('Geolocation not supported'))
+                         return
+                    }
+                    navigator.geolocation.getCurrentPosition(
+                         pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                         err => reject(err),
+                         { enableHighAccuracy: true }
+                    )
+               })
+          }
+
+          async function startTracking() {
+               try {
+                    const { latitude, longitude } = await getUserLocation()
+
+                    // Pan map to user
+                    map.setView([latitude, longitude], 14)
+
+                    // Place self marker
+                    myMarker = L.marker([latitude, longitude], {
+                         icon: makeIcon('#00e5a0', 'YOU'),
+                         zIndexOffset: 1000
+                    }).addTo(map)
+                    myMarker.bindPopup('<b style="font-family:monospace;font-size:12px">You</b>').openPopup()
+
+                    // Emit initial
+                    emitLocation(latitude, longitude)
+
+                    // Update bottom bar
+                    updateCoordStats(latitude, longitude)
+
+                    // Send updates every 3s
+                    setInterval(async () => {
+                         try {
+                              const { latitude: lat, longitude: lng } = await getUserLocation()
+                              emitLocation(lat, lng)
+                              myMarker.setLatLng([lat, lng])
+                              updateCoordStats(lat, lng)
+                         } catch (e) {
+                              console.warn('Location update failed:', e.message)
+                         }
+                    }, 3000)
+
+               } catch (err) {
+                    console.error('Could not get location:', err.message)
+                    alert('Location permission is required for LiveTrace to work.')
+               }
+          }
+
+          function emitLocation(latitude, longitude) {
+               socket.emit('client:location_update', {
+                    latitude,
+                    longitude,
+                    userId: currentUser?.id,
+                    name: currentUser?.name
+               })
+          }
+
+          function updateCoordStats(lat, lng) {
+               document.getElementById('stat-lat').textContent = lat.toFixed(5)
+               document.getElementById('stat-lng').textContent = lng.toFixed(5)
+          }
+
+          // ── SIDEBAR HELPERS ──
+          function addSidebarUser(userId, name, lat, lng) {
+               const list = document.getElementById('user-list')
+               const el = document.createElement('div')
+               el.className = 'user-item'
+               el.dataset.userId = userId
+               el.innerHTML = `
+        <div class="user-item-dot"></div>
+        <div class="user-item-info">
+          <div class="user-item-name">${name || userId.slice(0, 12)}</div>
+          <div class="user-item-coords">${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
+        </div>
+      `
+               el.addEventListener('click', () => {
+                    map.setView([lat, lng], 15)
+                    remoteMarkers.get(userId)?.marker?.openPopup()
+               })
+               list.appendChild(el)
+               userItems.set(userId, el)
+          }
+
+          function updateSidebarUser(userId, lat, lng) {
+               const el = userItems.get(userId)
+               if (el) {
+                    el.querySelector('.user-item-coords').textContent =
+                         `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+               }
+          }
+
+          function removeSidebarUser(userId) {
+               const el = userItems.get(userId)
+               if (el) { el.remove(); userItems.delete(userId) }
+          }
+
+          // ── LOGOUT ──
+          document.getElementById('logout-btn').addEventListener('click', async () => {
+               await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+               window.location.href = '/login'
+          })
+
+          // ── BOOT ──
+          async function init() {
+               const user = await checkAuth()
+               if (!user) return
+
+               currentUser = user
+
+               // Populate topbar
+               document.getElementById('user-name-display').textContent = user.name || user.email
+               if (user.avatarUrl) {
+                    const img = document.getElementById('user-avatar-img')
+                    img.src = user.avatarUrl
+                    img.style.display = 'block'
+                    document.getElementById('user-avatar-placeholder').style.display = 'none'
+               } else {
+                    document.getElementById('user-avatar-placeholder').textContent =
+                         (user.name || 'U')[0].toUpperCase()
+               }
+
+               // Add self to sidebar
+               const selfEl = document.createElement('div')
+               selfEl.className = 'user-item self'
+               selfEl.innerHTML = `
+        <div class="user-item-dot"></div>
+        <div class="user-item-info">
+          <div class="user-item-name">${user.name || 'You'} (you)</div>
+          <div class="user-item-coords" id="self-coords">waiting for GPS...</div>
+        </div>
+      `
+               document.getElementById('user-list').prepend(selfEl)
+
+               // Hide loading
+               const overlay = document.getElementById('loading-overlay')
+               overlay.classList.add('hidden')
+               setTimeout(() => overlay.remove(), 500)
+
+               // Start tracking
+               await startTracking()
+          }
+
+          init()
+     </script>
+</body>
+
+</html>
